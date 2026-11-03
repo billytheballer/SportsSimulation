@@ -1,0 +1,19 @@
+{
+  "passed": true,
+  "checks": {
+    "simulation": true,
+    "stats_model": true,
+    "elo": true,
+    "margin": true,
+    "total": true,
+    "team_points": true,
+    "coverage": true
+  },
+  "games": 1546,
+  "seasons": [
+    2021,
+    2022
+  ],
+  "manifest_hash": "85219a7764246a923f8306dee5a08fd89668af5f3fe5c8c48d936b9c818ec27e",
+  "ran_at": "2026-11-03T17:45:15.745567+00:00"
+}
