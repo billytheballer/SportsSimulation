@@ -14,7 +14,7 @@ dependencies = [
     "requests>=2.31",
     "scikit-learn>=1.4",
     "scipy>=1.11",
-    "streamlit>=1.40",
+    "streamlit>=1.50",
 ]
 
 [project.optional-dependencies]

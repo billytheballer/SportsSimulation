@@ -91,7 +91,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.31" },
     { name = "scikit-learn", specifier = ">=1.4" },
     { name = "scipy", specifier = ">=1.11" },
-    { name = "streamlit", specifier = ">=1.40" },
+    { name = "streamlit", specifier = ">=1.50" },
 ]
 provides-extras = ["dev"]
 

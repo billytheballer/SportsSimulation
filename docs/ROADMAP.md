@@ -68,11 +68,13 @@ ahead of Elo, and behind listed betting lines. See [what the results mean](FINAL
 **4C: Production model.** Trains on 2016-25 with the same frozen settings. Completed 2026 games update
 team ratings and stats without refitting anything, and they're scored as a live test in the app.
 
-## Stage 5: Publish
+## Stage 5: Publish (prepared; publishing decisions are the owner's)
 
-- Clean README with real results, screenshots, and a model card
-- Optional free hosting on Streamlit Community Cloud. The app reads a saved bundle of derived values,
-  so it needs no API key. Check CFBD's terms before publishing a bundle
+- README with real results and screenshots, a [model card](MODEL_CARD.md), and a
+  [publishing checklist](PUBLISHING.md)
+- Tested from a clean clone, and with a hosting-style install that has no raw data or API key
+- A `--public` bundle option that leaves out this season's scores and schedule
+- Still to do by the owner: merge to `main`, make the repo public, and optionally deploy
 
 ## Stage 6: Advanced experiments (kept only if they win on validation)
 

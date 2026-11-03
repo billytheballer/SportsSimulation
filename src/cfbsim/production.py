@@ -14,6 +14,7 @@ Only completed games enter team data, so a forecast can't see its own or a later
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import date
 from typing import Any
 
@@ -258,6 +259,19 @@ def assemble_production(
             [record for record in records if record.get("season") == season], now
         ),
         live_scorecard=_live_scorecard(frame, score_model, simulator, season),
+    )
+
+
+def public_copy(bundle: PredictionBundle) -> PredictionBundle:
+    """A copy for a public repo, without this season's game scores or schedule.
+
+    CFBD's terms allow publishing derived outputs but not raw data as a dataset. Team
+    pairs and dates stay, so the app can still warn when a matchup is a rematch.
+    """
+    return replace(
+        bundle,
+        completed_matchups=[(first, second, played_on, "") for first, second, played_on, _ in bundle.completed_matchups],
+        upcoming=[],
     )
 
 

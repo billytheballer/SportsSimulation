@@ -4,6 +4,14 @@ Pick two FBS teams and get win probabilities, projected scores, 10,000 simulated
 factors behind the prediction. Every number comes from a statistical model trained on historical
 data and tested on games it never saw. No language model picks a winner.
 
+![A win probability prediction for Ohio State against Oregon at a neutral site](docs/images/prediction.jpg)
+
+| | |
+|---|---|
+| ![Score ranges and simulated results](docs/images/score-ranges.jpg) | ![The factors behind the prediction](docs/images/factors.jpg) |
+
+*Screenshots from November 3, 2026, using team data through October 31, 2026.*
+
 ## Results
 
 The final evaluation ran once on 2,398 FBS games from 2023-25, using a model frozen beforehand.
@@ -78,12 +86,10 @@ uv run cfbsim fetch-stats
 ```
 
 ```bash
-uv run cfbsim stage3
-```
-
-```bash
 uv run cfbsim build-demo
 ```
+
+The model settings come from the saved Stage 3 report, so you don't need to repeat that step.
 
 ## Keep the current season up to date
 
@@ -141,8 +147,8 @@ uv run pytest
 5. **A Monte Carlo simulation** draws real pairs of scores from past games with similar expectations, and
    plays out overtime when regulation ends tied.
 
-See [how the simulation works](docs/SIMULATION.md) for assumptions and realism tests, and the
-[roadmap](docs/ROADMAP.md) for the stages.
+See the [model card](docs/MODEL_CARD.md) for a one-page summary, [how the simulation works](docs/SIMULATION.md)
+for assumptions and realism tests, and the [roadmap](docs/ROADMAP.md) for the stages.
 
 ## How the code is organized
 
@@ -178,26 +184,15 @@ for analysis and education, and isn't betting advice.
 
 ## Deploying for free
 
-This hasn't been deployed yet. To host on [Streamlit Community Cloud](https://streamlit.io/cloud) (free):
-
-1. Build the current bundle, then remove the `bundles/` line from `.gitignore` and commit
-   `bundles/production_2026.joblib`.
-2. Push to GitHub and create an app pointing at `streamlit_app.py`, with Python 3.12.
-
-The hosted app needs no API key, since it only reads the bundle. Keep your key in `.env` on your own
-computer, and repeat step 1 to publish updates.
-
-**Check before publishing a bundle.** CFBD's terms don't allow raw API data in a public repo but do allow
-derived outputs such as models and ratings. A bundle holds model coefficients, team averages, and anonymous
-score pairs with no team names. It also lists the current season's completed scores and upcoming schedule,
-for rematch notices and the game picker. Decide for yourself whether that fits CFBD's terms, or ask CFBD.
-This isn't legal advice.
+This hasn't been deployed yet. The hosted app needs no API key, since it only reads a saved bundle. See the
+[publishing checklist](docs/PUBLISHING.md) for each step, including what a public bundle contains.
 
 ## Data and license
 
 Data provided by [CollegeFootballData.com](https://collegefootballdata.com), under
 [its own terms](https://collegefootballdata.com/terms). This repo holds no raw game data, because CFBD's terms
 don't allow committing it to a public repo. See [data sources](docs/DATA_SOURCES.md) for what's free.
-Not official NCAA, conference, or school data.
+Not official NCAA, conference, or school data. Team and conference names belong to their owners and are
+used only to identify teams.
 
 The source code is under the [MIT License](LICENSE).

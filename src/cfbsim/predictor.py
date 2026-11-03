@@ -221,10 +221,11 @@ class Predictor:
             )
         for first, second, played_on, score in bundle.completed_matchups:
             if {first, second} == {home, away}:
+                result = f" ({score})" if score else ""
                 notices.append(
                     Notice(
                         "caution",
-                        f"These teams already played on {played_on:%B %-d, %Y} ({score}). That result is included "
+                        f"These teams already played on {played_on:%B %-d, %Y}{result}. That result is included "
                         "in the team data, so this is a hypothetical rematch and not a pre-game forecast of that game.",
                     )
                 )

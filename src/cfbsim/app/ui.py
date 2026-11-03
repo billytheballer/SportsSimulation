@@ -91,12 +91,12 @@ def show_notices(prediction: MatchupPrediction) -> None:
 
 def _table_view(table: pd.DataFrame, title: str = "View as a table") -> None:
     with st.expander(title):
-        st.dataframe(table, hide_index=True, use_container_width=True)
+        st.dataframe(table, hide_index=True, width="stretch")
 
 
 def _chart(chart_and_table: tuple[Any, pd.DataFrame], table_title: str = "View as a table") -> None:
     chart, table = chart_and_table
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart, width="stretch")
     _table_view(table, table_title)
 
 
@@ -210,7 +210,7 @@ def simulation_section(prediction: MatchupPrediction) -> None:
             for item in prediction.summary["common_scores"]
         ]
         st.caption("Even the most common exact score is unlikely, which is why the ranges matter more.")
-        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
 
 def factors_section(prediction: MatchupPrediction) -> None:

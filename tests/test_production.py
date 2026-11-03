@@ -203,3 +203,14 @@ def test_update_season_refuses_before_final_evaluation(tmp_path, monkeypatch):
     with pytest.raises(ProductionError, match="final evaluation"):
         production.update_season(client)
     assert client.session.calls == []
+
+
+def test_public_copy_removes_scores_and_schedule_but_still_predicts(bundle):
+    public = production.public_copy(bundle)
+    assert public.upcoming == []
+    assert all(score == "" for *_, score in public.completed_matchups)
+    assert bundle.upcoming and any(score for *_, score in bundle.completed_matchups)
+    home, away = next((a, b) for a, b, *_ in public.completed_matchups)
+    result = Predictor(public).predict(home, away, simulations=100)
+    rematch = next(notice.text for notice in result.notices if "hypothetical rematch" in notice.text)
+    assert "()" not in rematch and " 0, " not in rematch

@@ -81,7 +81,7 @@ def main() -> None:
         home = home_column.selectbox("Home team", names, index=index_of(names, preferred_home, 0), key=f"home-{form_key}")
         away = away_column.selectbox("Away team", names, index=index_of(names, preferred_away, 1), key=f"away-{form_key}")
         neutral = site_column.checkbox("Neutral site", value=bool(preset and preset["neutral_site"]), key=f"site-{form_key}")
-        submitted = go_column.form_submit_button("Generate prediction", type="primary", use_container_width=True)
+        submitted = go_column.form_submit_button("Generate prediction", type="primary", width="stretch")
 
     if submitted:
         st.session_state["requested_matchup"] = (path, home, away, neutral)

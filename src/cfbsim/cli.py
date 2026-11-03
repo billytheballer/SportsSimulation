@@ -123,10 +123,12 @@ def _update_season(_: argparse.Namespace) -> int:
     return 0
 
 
-def _build_production(_: argparse.Namespace) -> int:
+def _build_production(args: argparse.Namespace) -> int:
     bundle = production.build_production_bundle(CFBDClient())
+    if args.public:
+        bundle = production.public_copy(bundle)
     path = save_bundle(bundle, PRODUCTION_BUNDLE)
-    print(f"Saved {path}")
+    print(f"Saved {path}" + (" (public copy, without game scores or schedule)" if args.public else ""))
     print(f"Team data current through {bundle.data_through:%B %-d, %Y} ({bundle.data_note}).")
     print(f"Upcoming games listed: {len(bundle.upcoming)}. This season so far: {json.dumps(bundle.live_scorecard, indent=2)}")
     return 0
@@ -210,6 +212,8 @@ def main(argv: list[str] | None = None) -> int:
     build_production = commands.add_parser(
         "build-production", help="save the 2026 production model for the app"
     )
+    build_production.add_argument("--public", action="store_true",
+                                  help="leave out this season's scores and schedule, for publishing")
     build_production.set_defaults(run=_build_production)
 
     build_demo = commands.add_parser(
