@@ -104,7 +104,12 @@ uv run cfbsim update-season
 uv run cfbsim build-production
 ```
 
-A typical weekly update uses about 10 API calls. Check your usage with:
+The current-season forecast also uses ESPN FPI and official availability reports, which were never part of the
+final evaluation. The app shows the tested model's number beside the adjusted one. See
+[FPI and player availability](docs/ADJUSTMENTS.md) to set this up, including one `cfbsim fit-availability` run
+of about 120 API calls.
+
+A typical weekly update uses about 20 API calls. Check your usage with:
 
 ```bash
 uv run cfbsim usage
@@ -178,7 +183,8 @@ for assumptions and realism tests, and the [roadmap](docs/ROADMAP.md) for the st
 
 ## Limitations
 
-The model can't see injuries, player availability, suspensions, weather, or coaching changes. Simulated
+The tested model can't see injuries, player availability, suspensions, weather, or coaching changes. The added
+FPI and availability layer hasn't been tested, and it covers only reports on file and offensive players. Simulated
 score ranges run slightly wide. Bowl games are close to a coin flip for this model. This project is
 for analysis and education, and isn't betting advice.
 

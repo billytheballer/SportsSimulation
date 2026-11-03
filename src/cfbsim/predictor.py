@@ -12,6 +12,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
+from cfbsim.adjustments import apply_adjustments
 from cfbsim.bundle import COMPARISON_METRICS, HISTORICAL, PredictionBundle
 from cfbsim.features import matchup_row
 from cfbsim.matchup import factors_table
@@ -71,6 +72,9 @@ class MatchupPrediction:
     away_scores: np.ndarray
     notices: list[Notice]
     freshness: Freshness
+    # The tested model's own results, and the layer on top, when that layer is in use.
+    base_summary: dict | None = None
+    adjustment: dict | None = None
 
 
 def assess_freshness(bundle: PredictionBundle, today: date | None = None) -> Freshness:
@@ -94,11 +98,16 @@ def assess_freshness(bundle: PredictionBundle, today: date | None = None) -> Fre
             through,
         )
     note = f" ({bundle.data_note})" if bundle.data_note else ""
+    injuries = (
+        "Injuries count only when an official report is on file."
+        if bundle.adjustments is not None
+        else "Injuries and other late news are never included."
+    )
     return Freshness(
         True,
         f"Team stats current through {through:%B %-d, %Y}",
         f"Includes every completed game available through that date{note}. Games played after it are not "
-        "included. Injuries and other late news are never included.",
+        f"included. {injuries}",
         through,
     )
 
@@ -144,10 +153,6 @@ class Predictor:
         home_view, away_view = team_view(row, "home"), team_view(row, "away")
         home_expected = float(bundle.score_model.predict(home_view)[0])
         away_expected = float(bundle.score_model.predict(away_view)[0])
-        games = bundle.simulator.simulate(
-            home_expected, away_expected, simulations, np.random.default_rng(seed)
-        )
-        summary = summarize(games)
         stats_probability = float(bundle.win_model.predict(win_row)[0])
         factors = factors_table(
             bundle.score_model.contributions(home_view).iloc[0],
@@ -155,10 +160,30 @@ class Predictor:
         )
         for factor in factors:
             factor["label"] = FACTOR_LABELS[factor["factor"]]
+
+        adjustment = None
+        base_summary = None
+        if bundle.adjustments is not None:
+            home_field = next(factor["margin"] for factor in factors if factor["factor"] == "site")
+            adjustment = apply_adjustments(
+                home, away, home_expected, away_expected, home_field, bundle.adjustments, today or date.today()
+            )
+            base_summary = summarize(
+                bundle.simulator.simulate(home_expected, away_expected, simulations, np.random.default_rng(seed))
+            )
+            home_expected, away_expected = adjustment["home_expected"], adjustment["away_expected"]
+            factors = self._with_adjustment_factors(factors, adjustment)
+
+        games = bundle.simulator.simulate(
+            home_expected, away_expected, simulations, np.random.default_rng(seed)
+        )
+        summary = summarize(games)
         return MatchupPrediction(
             home=home,
             away=away,
             neutral_site=neutral_site,
+            base_summary=base_summary,
+            adjustment=adjustment,
             summary=summary,
             home_expected=home_expected,
             away_expected=away_expected,
@@ -167,9 +192,22 @@ class Predictor:
             comparison=self._comparison(home, away),
             home_scores=games.home,
             away_scores=games.away,
-            notices=self._notices(home, away, summary, stats_probability),
+            notices=self._notices(home, away, summary, stats_probability, adjustment),
             freshness=assess_freshness(bundle, today),
         )
+
+    @staticmethod
+    def _with_adjustment_factors(factors: list[dict], adjustment: dict) -> list[dict]:
+        extra = []
+        if adjustment["fpi_used"]:
+            extra.append(("fpi", f"ESPN FPI ({adjustment['fpi_weight']:.0%} blend)", adjustment["fpi_margin_shift"]))
+        if adjustment["players"]:
+            extra.append(("availability", "Official player availability", adjustment["availability_margin"]))
+        added = [
+            {"factor": key, "label": label, "home_points": 0.0, "away_points": 0.0, "margin": float(margin)}
+            for key, label, margin in extra
+        ]
+        return sorted([*factors, *added], key=lambda row: -abs(row["margin"]))
 
     def _comparison(self, home: str, away: str) -> pd.DataFrame:
         profiles = self.bundle.profiles
@@ -190,9 +228,23 @@ class Predictor:
                 )
         return pd.DataFrame(rows)
 
-    def _notices(self, home: str, away: str, summary: dict, stats_probability: float) -> list[Notice]:
+    def _notices(
+        self, home: str, away: str, summary: dict, stats_probability: float, adjustment: dict | None
+    ) -> list[Notice]:
         bundle = self.bundle
         notices = []
+        if adjustment is not None:
+            for team, has_reports in ((home, adjustment["home_has_reports"]), (away, adjustment["away_has_reports"])):
+                if not has_reports:
+                    notices.append(
+                        Notice(
+                            "caution",
+                            f"No official availability report is on file for {team}'s next game. That doesn't mean "
+                            "the team is healthy, and many non-conference games have no report at all.",
+                        )
+                    )
+            if not adjustment["fpi_used"]:
+                notices.append(Notice("caution", "FPI isn't included in this prediction because it's missing or out of date."))
         for team in (home, away):
             if pd.isna(bundle.profiles.at[team, "returning"]):
                 notices.append(

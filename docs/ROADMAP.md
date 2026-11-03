@@ -82,3 +82,5 @@ team ratings and stats without refitting anything, and they're scored as a live 
 - Weather and game location, if the leakage problem below can be solved
 - Possible improvements to investigate: bowl games, slightly wide score ranges. 2023-25 is now used, so
   any change must be judged on new games as they're played
+- ESPN FPI and official availability reports are in the current-season forecast as an untested
+  [adjustment layer](ADJUSTMENTS.md). Forecasts are logged before kickoff so it can be scored on future games

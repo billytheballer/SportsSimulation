@@ -18,13 +18,18 @@ st.set_page_config(page_title="CFB Matchup Simulator", page_icon="🏈", layout=
 
 
 @st.cache_resource(show_spinner="Loading the model...")
-def get_bundle(path: str) -> PredictionBundle:
+def get_bundle(path: str, modified: float) -> PredictionBundle:
+    # `modified` makes a rebuilt bundle load without restarting the app.
     return load_bundle(Path(path))
 
 
+def modified_time(path: str) -> float:
+    return Path(path).stat().st_mtime
+
+
 @st.cache_data(show_spinner=False)
-def run_prediction(path: str, home: str, away: str, neutral: bool) -> MatchupPrediction:
-    return Predictor(get_bundle(path)).predict(home, away, neutral)
+def run_prediction(path: str, modified: float, home: str, away: str, neutral: bool) -> MatchupPrediction:
+    return Predictor(get_bundle(path, modified)).predict(home, away, neutral)
 
 
 def available_bundles() -> dict[str, Path]:
@@ -66,7 +71,7 @@ def main() -> None:
     else:
         choice = next(iter(options))
     path = str(options[choice])
-    bundle = get_bundle(path)
+    bundle = get_bundle(path, modified_time(path))
     ui.status_banner(assess_freshness(bundle))
 
     predictor = Predictor(bundle)
@@ -97,12 +102,14 @@ def main() -> None:
         return
 
     with st.spinner("Simulating 10,000 games..."):
-        prediction = run_prediction(*request)
+        selected_path, home, away, neutral = request
+        prediction = run_prediction(selected_path, modified_time(selected_path), home, away, neutral)
 
     ui.win_probability_card(prediction)
     st.write("")
     ui.projection_tiles(prediction)
     ui.show_notices(prediction)
+    ui.adjustments_section(prediction)
     ui.score_range_section(prediction)
     ui.simulation_section(prediction)
     ui.factors_section(prediction)

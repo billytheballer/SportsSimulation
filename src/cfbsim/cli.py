@@ -6,7 +6,7 @@ import argparse
 import json
 import sys
 
-from cfbsim import final_eval, production, stage2, stage3
+from cfbsim import adjustments, final_eval, production, stage2, stage3
 from cfbsim.backtest import report_to_markdown, run_backtest
 from cfbsim.bundle import DEMO_BUNDLE, PRODUCTION_BUNDLE, build_demo_bundle, save_bundle
 from cfbsim.client import CFBDClient, CFBDError
@@ -123,12 +123,35 @@ def _update_season(_: argparse.Namespace) -> int:
     return 0
 
 
+def _fit_availability(_: argparse.Namespace) -> int:
+    report = adjustments.fit_player_impact(CFBDClient())
+    print(json.dumps(report, indent=2))
+    return 0
+
+
+def _add_availability(args: argparse.Namespace) -> int:
+    row = {name: getattr(args, name) for name in adjustments.REPORT_FIELDS}
+    try:
+        report = adjustments.add_report(row)
+    except adjustments.AvailabilityError as error:
+        print(f"Refused: {error}", file=sys.stderr)
+        return 1
+    print(f"Saved: {report['team']}, {report['player']}, {report['status']}. Run `cfbsim build-production` to use it.")
+    return 0
+
+
 def _build_production(args: argparse.Namespace) -> int:
     bundle = production.build_production_bundle(CFBDClient())
-    if args.public:
+    for message in bundle.adjustment_messages:
+        print(f"Note: {message}")
+    if not args.public:
+        log_path = production.log_upcoming_forecasts(bundle)
+        if log_path:
+            print(f"Logged this week's forecasts to {log_path.name}")
+    else:
         bundle = production.public_copy(bundle)
     path = save_bundle(bundle, PRODUCTION_BUNDLE)
-    print(f"Saved {path}" + (" (public copy, without game scores or schedule)" if args.public else ""))
+    print(f"Saved {path}" + (" (public copy, without scores, schedule, FPI, or player reports)" if args.public else ""))
     print(f"Team data current through {bundle.data_through:%B %-d, %Y} ({bundle.data_note}).")
     print(f"Upcoming games listed: {len(bundle.upcoming)}. This season so far: {json.dumps(bundle.live_scorecard, indent=2)}")
     return 0
@@ -215,6 +238,24 @@ def main(argv: list[str] | None = None) -> int:
     build_production.add_argument("--public", action="store_true",
                                   help="leave out this season's scores and schedule, for publishing")
     build_production.set_defaults(run=_build_production)
+
+    fit_availability = commands.add_parser(
+        "fit-availability", help="estimate player impact from 2016-22 box scores; uses about 120 API calls once"
+    )
+    fit_availability.set_defaults(run=_fit_availability)
+
+    add_availability = commands.add_parser(
+        "add-availability", help="record one player from an official availability report"
+    )
+    add_availability.add_argument("--team", required=True)
+    add_availability.add_argument("--player", required=True)
+    add_availability.add_argument("--status", required=True, help=", ".join(adjustments.ABSENCE_CHANCE))
+    add_availability.add_argument("--game-date", dest="game_date", required=True, help="YYYY-MM-DD")
+    add_availability.add_argument("--reported-at", dest="reported_at", required=True,
+                                  help="when it was published, such as 2026-11-05T20:00:00-05:00")
+    add_availability.add_argument("--source-url", dest="source_url", required=True,
+                                  help="the official conference or school page")
+    add_availability.set_defaults(run=_add_availability)
 
     build_demo = commands.add_parser(
         "build-demo", help="save the Stage 3 model with data through 2022 for the app"

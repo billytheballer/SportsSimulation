@@ -44,7 +44,9 @@ Checked on November 3, 2026 with the free tier. Every input the model needs is a
 | Box scores and per-game advanced stats | Available through week 9 |
 | Returning production | Available for 136 teams. North Dakota State and Sacramento State, both new to FBS, have none, and the app says so |
 | Recruiting classes | Available for 221 teams |
-| Injuries, weather | Not used: no free injury source was found, and CFBD weather requires payment |
+| ESPN FPI | Current values through CFBD, saved weekly because past pre-game values can't be recovered |
+| Official availability reports | Published by conferences and schools, mostly for conference games. Entered with their source |
+| Weather | Not used: CFBD weather requires payment |
 
 CFBD doesn't publish when each game's stats appear after it ends, so a recently finished game
 could lack stats for a short time. Its Elo rating would still update, and the missing stats stay missing.
@@ -59,7 +61,7 @@ could lack stats for a short time. Its Elo rating would still update, and the mi
 | Recent form | Calculated | Derived from earlier games |
 | Betting lines | Free | CFBD `/lines`, benchmark only |
 | Weather | Unresolved | CFBD charges for it (Tier 1). A free weather archive could work, but see below |
-| Injuries and availability | Not available | No reliable free source found; excluded and disclosed |
+| Injuries and availability | Current reports only | Official reports exist for recent seasons, but no usable history. See [FPI and player availability](ADJUSTMENTS.md) |
 
 ### Timing assumptions in the model
 
@@ -87,7 +89,6 @@ checked first. Until both are settled, weather stays out of the model.
 
 ### Injuries are a real limitation
 
-I found no reliable, free, historical source for FBS injuries, and schools aren't held to a
-single reporting standard. Rather than approximate, the model leaves injuries out. The app
-will say that predictions don't account for player availability, so a late injury to a
-starting quarterback won't be reflected.
+No national rule requires reports, and coverage varies by conference. Official reports began between 2023 and 2025,
+mostly for conference games, and no usable archive was found. The tested model therefore leaves injuries out. A
+separate, untested layer uses current reports when they're on file. See [FPI and player availability](ADJUSTMENTS.md).

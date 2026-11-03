@@ -24,6 +24,9 @@ than this model in testing, and it can't see injuries or other late news.
 
 Betting lines are never inputs. No language model produces any prediction.
 
+**Untested addition:** current-season forecasts also apply [ESPN FPI and official availability reports](ADJUSTMENTS.md).
+They use assumed weights because no pre-game history exists, and nothing below measures them.
+
 ## Data
 
 All data comes from the [CollegeFootballData.com](https://collegefootballdata.com) free tier. Raw data isn't in
@@ -66,7 +69,8 @@ accuracy was 75.0%, log loss 0.536, and margin MAE 12.4. This is a partial seaso
 - **Neutral sites:** 60.4% accuracy on 202 games.
 - **New FBS teams:** no returning-production data. On 57 games, it was no better than Elo.
 - **Wide ranges:** 90% ranges contained 92-93% of results. Lopsided games are somewhat overstated.
-- **Not modeled:** injuries, player availability, suspensions, weather, coaching changes, and team styles.
+- **Not in the tested model:** injuries, player availability, suspensions, weather, coaching changes, and team styles.
+- **Availability layer:** covers offensive players only, needs a report on file, and hasn't been tested.
 - **Possible timing issue:** returning production and recruiting data may include later corrections, and
   their exact publication dates aren't confirmed.
 - **Change over time:** the model doesn't refit during a season, and college football keeps changing.

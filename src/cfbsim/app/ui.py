@@ -68,8 +68,8 @@ def apply_styles() -> None:
 def brand_header() -> None:
     st.markdown(
         '<div class="brand"><h1>College Football Matchup Simulator</h1>'
-        "<p>Statistical win probabilities and 10,000 simulated games. Every number comes from a model "
-        "tested on games it never saw.</p></div>",
+        "<p>Statistical win probabilities and 10,000 simulated games, built on a model tested on games it "
+        "never saw.</p></div>",
         unsafe_allow_html=True,
     )
 
@@ -119,12 +119,73 @@ def win_probability_card(prediction: MatchupPrediction) -> None:
         <div class="split"><div class="home" style="width:{home_share * 100:.2f}%"></div>
         <div class="away" style="width:{away_share * 100:.2f}%"></div></div>
         <div class="sub" style="margin-top:12px">From {summary['simulations']:,} simulated games.
+        {_base_comparison(prediction)}
         Team-stat model for comparison: {escape(prediction.home)} {prediction.stats_model_home_probability:.1%},
         {escape(prediction.away)} {1 - prediction.stats_model_home_probability:.1%}.
         Overtime in {summary['overtime_probability']:.1%} of simulations.</div>
         </div>""",
         unsafe_allow_html=True,
     )
+
+
+def _base_comparison(prediction: MatchupPrediction) -> str:
+    if prediction.base_summary is None:
+        return ""
+    share = prediction.base_summary["home_win_probability"]
+    adjustment = prediction.adjustment
+    parts = []
+    if adjustment["fpi_used"]:
+        parts.append("ESPN FPI")
+    if adjustment["players"]:
+        parts.append("official availability reports")
+    if not parts:
+        return f"Tested model alone: {escape(prediction.home)} {share:.1%}."
+    return (
+        f"Includes {' and '.join(parts)}, which aren't part of the tested model. "
+        f"Tested model alone: {escape(prediction.home)} {share:.1%}."
+    )
+
+
+def adjustments_section(prediction: MatchupPrediction) -> None:
+    """Show exactly what FPI and availability reports changed, with their sources."""
+    adjustment = prediction.adjustment
+    if adjustment is None:
+        return
+    section(
+        "FPI and player availability",
+        "These adjust the tested model and haven't been tested themselves, because no pre-game history exists. "
+        "They're being logged before kickoff so they can be scored on future games.",
+    )
+    if adjustment["fpi_used"]:
+        st.markdown(
+            f"**ESPN FPI** as of {adjustment['fpi_as_of']:%B %-d, %Y}: {prediction.home} {adjustment['fpi_home']:+.1f}, "
+            f"{prediction.away} {adjustment['fpi_away']:+.1f}. With home field, FPI's margin is "
+            f"{adjustment['fpi_margin']:+.1f} points for {prediction.home}. It gets an assumed "
+            f"{adjustment['fpi_weight']:.0%} weight, which moved the margin {adjustment['fpi_margin_shift']:+.1f} points."
+        )
+    else:
+        st.markdown("**ESPN FPI** isn't included here because it's missing or out of date.")
+    if adjustment["players"]:
+        rows = [
+            {
+                "Team": row["team"],
+                "Player": row["player"],
+                "Official status": row["status"],
+                "Points off team": round(row["points"], 1),
+                "Basis": row["note"],
+                "Source": row["source_url"],
+            }
+            for row in adjustment["players"]
+        ]
+        st.dataframe(
+            pd.DataFrame(rows),
+            hide_index=True,
+            width="stretch",
+            column_config={"Source": st.column_config.LinkColumn("Source", display_text="Official report")},
+        )
+        st.caption("Status-to-absence chances are assumptions. Defensive players and linemen have no estimated effect.")
+    else:
+        st.markdown("**Player availability:** no official reports are on file for these teams' next games.")
 
 
 def _tile(label: str, value: str, lines: list[str]) -> str:
@@ -283,8 +344,9 @@ def model_accuracy_section(bundle: PredictionBundle, reports_dir: Path = REPORTS
         st.markdown(
             "**Where it struggles:** bowl games and other neutral-site games, where it has done little better "
             "than a coin flip. A listed betting line has also been more accurate.\n\n"
-            "**What the model can't see:** injuries, player availability, suspensions, weather, and coaching "
-            "changes. Simulated score ranges have tended to run slightly wide."
+            "**What the model can't see:** injuries and suspensions that aren't in an official report on file, "
+            "plus weather and coaching changes. Simulated score ranges have tended to run slightly wide.\n\n"
+            "**What these results cover:** the tested model only. FPI and availability adjustments aren't included in these numbers."
         )
         st.caption(f"Trained on seasons {min(bundle.training_seasons)}-{max(bundle.training_seasons)}.")
 

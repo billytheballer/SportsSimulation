@@ -52,12 +52,15 @@ class CFBDClient:
         monthly_budget: int = DEFAULT_MONTHLY_BUDGET,
         session: Any = None,
         month: Callable[[], str] = _current_month,
+        ledger_path: Path | None = None,
     ) -> None:
         self.api_key = api_key if api_key is not None else load_api_key()
         self.cache_dir = Path(cache_dir)
         self.monthly_budget = monthly_budget
         self.session = session or requests.Session()
         self.month = month
+        # A separate cache can still count against the project's shared call budget.
+        self._ledger_override = Path(ledger_path) if ledger_path else None
 
     def cache_path(self, endpoint: str, params: dict[str, Any]) -> Path:
         parts = [f"{key}={params[key]}" for key in sorted(params)]
@@ -103,7 +106,7 @@ class CFBDClient:
 
     @property
     def _ledger_path(self) -> Path:
-        return self.cache_dir / "_usage.json"
+        return self._ledger_override or self.cache_dir / "_usage.json"
 
     def calls_this_month(self) -> int:
         if not self._ledger_path.exists():
