@@ -144,6 +144,7 @@ def _build_production(args: argparse.Namespace) -> int:
     bundle = production.build_production_bundle(CFBDClient())
     for message in bundle.adjustment_messages:
         print(f"Note: {message}")
+    print(f"Predicted {len(bundle.board)} remaining games.")
     if not args.public:
         log_path = production.log_upcoming_forecasts(bundle)
         if log_path:

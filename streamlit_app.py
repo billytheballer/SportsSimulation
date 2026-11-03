@@ -1,8 +1,9 @@
-"""College Football Matchup Simulator. Run with: uv run streamlit run streamlit_app.py"""
+"""Gridiron Forecast, a college football prediction app. Run with: uv run streamlit run streamlit_app.py"""
 
 from __future__ import annotations
 
 import sys
+from datetime import date
 from pathlib import Path
 
 # Lets the app run on hosts that don't install this project as a package.
@@ -10,11 +11,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
 import streamlit as st
 
-from cfbsim.app import ui
+from cfbsim.app import theme, ui
 from cfbsim.bundle import DEMO_BUNDLE, PRODUCTION_BUNDLE, PredictionBundle, load_bundle
 from cfbsim.predictor import MatchupPrediction, Predictor, assess_freshness
 
-st.set_page_config(page_title="CFB Matchup Simulator", page_icon="🏈", layout="wide")
+st.set_page_config(page_title="Gridiron Forecast", page_icon="🏈", layout="wide")
 
 
 @st.cache_resource(show_spinner="Loading the model...")
@@ -28,95 +29,46 @@ def modified_time(path: str) -> float:
 
 
 @st.cache_data(show_spinner=False)
-def run_prediction(path: str, modified: float, home: str, away: str, neutral: bool) -> MatchupPrediction:
-    return Predictor(get_bundle(path, modified)).predict(home, away, neutral)
-
-
-def available_bundles() -> dict[str, Path]:
-    options = {}
-    if PRODUCTION_BUNDLE.exists():
-        options["Current season"] = PRODUCTION_BUNDLE
-    if DEMO_BUNDLE.exists():
-        options["Historical demonstration (2022)"] = DEMO_BUNDLE
-    return options
-
-
-def index_of(names: list[str], preferred: str, fallback: int) -> int:
-    return names.index(preferred) if preferred in names else min(fallback, len(names) - 1)
-
-
-def upcoming_game_picker(bundle: PredictionBundle, names: list[str]) -> dict | None:
-    """Optional shortcut that fills in the controls from the published schedule."""
-    games = [game for game in bundle.upcoming if game["home"] in names and game["away"] in names]
-    if not games:
-        return None
-    labels = {
-        f"{game['kickoff']:%b %-d} · {game['away']} {'vs.' if game['neutral_site'] else 'at'} {game['home']}": game
-        for game in games
-    }
-    choice = st.selectbox("Upcoming games (optional)", ["Choose your own matchup", *labels])
-    return labels.get(choice)
+def run_prediction(
+    path: str, modified: float, home: str, away: str, neutral: bool, game_date: date | None
+) -> MatchupPrediction:
+    return Predictor(get_bundle(path, modified)).predict(home, away, neutral, game_date=game_date)
 
 
 def main() -> None:
-    ui.apply_styles()
-    ui.brand_header()
-
-    options = available_bundles()
-    if not options:
+    theme.apply_styles()
+    # The current season is the main view. The 2022 demonstration appears only without it.
+    source = PRODUCTION_BUNDLE if PRODUCTION_BUNDLE.exists() else DEMO_BUNDLE
+    if not source.exists():
         st.error("No model bundle found. Build one first: `uv run cfbsim build-demo`")
         st.stop()
-    if len(options) > 1:
-        choice = st.radio("Team data", list(options), horizontal=True)
+    path = str(source)
+    modified = modified_time(path)
+    bundle = get_bundle(path, modified)
+    ui.brand_header(bundle, assess_freshness(bundle))
+
+    def run(home: str, away: str, neutral: bool, game_date: date | None) -> MatchupPrediction:
+        with st.spinner("Simulating 10,000 games..."):
+            return run_prediction(path, modified, home, away, neutral, game_date)
+
+    names = Predictor(bundle).team_names()
+    has_board = bool(bundle.board)
+    views = ["Game Center", *(["Schedule"] if has_board else []), "Teams", "Injuries", "About the Model"]
+    if st.session_state.get("view") not in views:
+        st.session_state["view"] = views[0]
+    view = st.radio("View", views, horizontal=True, key="view", label_visibility="collapsed")
+
+    if view == "Game Center":
+        ui.game_center(bundle, names, path, run)
+    elif view == "Schedule":
+        ui.schedule_page(bundle)
+    elif view == "Teams":
+        ui.teams_page(bundle)
+    elif view == "Injuries":
+        ui.injuries_page(bundle)
     else:
-        choice = next(iter(options))
-    path = str(options[choice])
-    bundle = get_bundle(path, modified_time(path))
-    ui.status_banner(assess_freshness(bundle))
-
-    predictor = Predictor(bundle)
-    names = predictor.team_names()
-    preset = upcoming_game_picker(bundle, names)
-    preferred_home = preset["home"] if preset else "Ohio State"
-    preferred_away = preset["away"] if preset else "Oregon"
-    # A new key resets the controls when a different upcoming game is picked.
-    form_key = f"{path}-{preferred_home}-{preferred_away}"
-    with st.form("matchup"):
-        home_column, away_column, site_column, go_column = st.columns([3, 3, 2, 2], vertical_alignment="bottom")
-        home = home_column.selectbox("Home team", names, index=index_of(names, preferred_home, 0), key=f"home-{form_key}")
-        away = away_column.selectbox("Away team", names, index=index_of(names, preferred_away, 1), key=f"away-{form_key}")
-        neutral = site_column.checkbox("Neutral site", value=bool(preset and preset["neutral_site"]), key=f"site-{form_key}")
-        submitted = go_column.form_submit_button("Generate prediction", type="primary", width="stretch")
-
-    if submitted:
-        st.session_state["requested_matchup"] = (path, home, away, neutral)
-
-    request = st.session_state.get("requested_matchup")
-    if request is None or request[0] != path:
-        st.info("Choose two teams and select **Generate prediction**.")
-        ui.footer()
-        return
-    if request[1] == request[2]:
-        st.error("Choose two different teams.")
-        ui.footer()
-        return
-
-    with st.spinner("Simulating 10,000 games..."):
-        selected_path, home, away, neutral = request
-        prediction = run_prediction(selected_path, modified_time(selected_path), home, away, neutral)
-
-    ui.win_probability_card(prediction)
-    st.write("")
-    ui.projection_tiles(prediction)
-    ui.show_notices(prediction)
-    ui.adjustments_section(prediction)
-    ui.score_range_section(prediction)
-    ui.simulation_section(prediction)
-    ui.factors_section(prediction)
-    ui.comparison_section(prediction)
-    st.write("")
-    ui.model_accuracy_section(bundle)
-    ui.footer()
+        ui.about_page(bundle)
+    theme.footer()
 
 
 main()

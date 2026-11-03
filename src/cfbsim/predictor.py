@@ -26,6 +26,7 @@ DISAGREEMENT_NOTICE = 0.10
 # In season, team data older than this may be missing recent games.
 STALE_AFTER_DAYS = 9
 THIN_HISTORY_WEIGHT = 2.0
+REPORT_LEAD_DAYS = 3
 
 FACTOR_LABELS = {
     "team_offense": "Offense",
@@ -134,6 +135,7 @@ class Predictor:
         simulations: int = DEFAULT_SIMULATIONS,
         seed: int = DEFAULT_SEED,
         today: date | None = None,
+        game_date: date | None = None,
     ) -> MatchupPrediction:
         names = self.team_names()
         for name in (home, away):
@@ -166,7 +168,8 @@ class Predictor:
         if bundle.adjustments is not None:
             home_field = next(factor["margin"] for factor in factors if factor["factor"] == "site")
             adjustment = apply_adjustments(
-                home, away, home_expected, away_expected, home_field, bundle.adjustments, today or date.today()
+                home, away, home_expected, away_expected, home_field, bundle.adjustments, today or date.today(),
+                game_date,
             )
             base_summary = summarize(
                 bundle.simulator.simulate(home_expected, away_expected, simulations, np.random.default_rng(seed))
@@ -192,7 +195,7 @@ class Predictor:
             comparison=self._comparison(home, away),
             home_scores=games.home,
             away_scores=games.away,
-            notices=self._notices(home, away, summary, stats_probability, adjustment),
+            notices=self._notices(home, away, summary, stats_probability, adjustment, game_date, today),
             freshness=assess_freshness(bundle, today),
         )
 
@@ -229,11 +232,27 @@ class Predictor:
         return pd.DataFrame(rows)
 
     def _notices(
-        self, home: str, away: str, summary: dict, stats_probability: float, adjustment: dict | None
+        self,
+        home: str,
+        away: str,
+        summary: dict,
+        stats_probability: float,
+        adjustment: dict | None,
+        game_date: date | None = None,
+        today: date | None = None,
     ) -> list[Notice]:
         bundle = self.bundle
         notices = []
-        if adjustment is not None:
+        days_away = None if game_date is None else (game_date - (today or date.today())).days
+        if adjustment is not None and days_away is not None and days_away > REPORT_LEAD_DAYS:
+            notices.append(
+                Notice(
+                    "info",
+                    "Official availability reports for this game aren't out yet. They usually appear about three days "
+                    "before kickoff. Team strength may also change before then, so this forecast will update.",
+                )
+            )
+        elif adjustment is not None:
             for team, has_reports in ((home, adjustment["home_has_reports"]), (away, adjustment["away_has_reports"])):
                 if not has_reports:
                     notices.append(
@@ -243,8 +262,8 @@ class Predictor:
                             "the team is healthy, and many non-conference games have no report at all.",
                         )
                     )
-            if not adjustment["fpi_used"]:
-                notices.append(Notice("caution", "FPI isn't included in this prediction because it's missing or out of date."))
+        if adjustment is not None and not adjustment["fpi_used"]:
+            notices.append(Notice("caution", "FPI isn't included in this prediction because it's missing or out of date."))
         for team in (home, away):
             if pd.isna(bundle.profiles.at[team, "returning"]):
                 notices.append(

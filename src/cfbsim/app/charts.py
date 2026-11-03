@@ -1,8 +1,8 @@
 """Altair charts for a matchup. Each function returns a chart and its table-view data.
 
 Home is always the first palette slot and away the second, so a team's color follows
-its role in every chart. These two slots are validated together in both color-blind
-and normal vision. Values are always available in a table beside each chart.
+its role in every chart. These are the palette's dark-mode steps, documented as validated
+together for color-blind and normal vision. Tables beside each chart hold every value.
 """
 
 from __future__ import annotations
@@ -13,16 +13,16 @@ import pandas as pd
 
 from cfbsim.predictor import MatchupPrediction
 
-HOME_COLOR = "#2a78d6"
-AWAY_COLOR = "#eb6834"
-HEAT_LOW, HEAT_HIGH = "#cde2fb", "#0d366b"
-SURFACE = "#fcfcfb"
-INK = "#0b0b0b"
-INK_SECONDARY = "#52514e"
-MUTED = "#898781"
-GRID = "#e1e0d9"
-BASELINE = "#c3c2b7"
-FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif'
+HOME_COLOR = "#3987e5"
+AWAY_COLOR = "#d95926"
+HEAT_LOW, HEAT_HIGH = "#184f95", "#cde2fb"
+SURFACE = "#131b2e"
+INK = "#f0f3f8"
+INK_SECONDARY = "#bcc5d3"
+MUTED = "#939dae"
+GRID = "#2a3448"
+BASELINE = "#46536a"
+FONT = '"Barlow", system-ui, -apple-system, "Segoe UI", sans-serif'
 HEATMAP_BIN = 7
 
 
@@ -91,7 +91,7 @@ def score_ranges(prediction: MatchupPrediction) -> tuple[alt.Chart, pd.DataFrame
         x="80% low:Q", x2="80% high:Q", y=y, color=color, tooltip=tooltip
     )
     median = alt.Chart(table).mark_point(
-        filled=True, size=120, color=SURFACE, stroke=INK, strokeWidth=2, opacity=1
+        filled=True, size=130, color="#ffffff", stroke=SURFACE, strokeWidth=2, opacity=1
     ).encode(x="Median:Q", y=y, tooltip=tooltip)
     label = alt.Chart(table).mark_text(dy=-18, color=INK, font=FONT, fontSize=13, fontWeight=600).encode(
         x="Median:Q", y=y, text=alt.Text("Median:Q", format=".0f")

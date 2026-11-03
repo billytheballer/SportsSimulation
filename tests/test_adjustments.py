@@ -348,8 +348,11 @@ def test_historical_bundle_has_no_adjustments():
 
 
 def test_public_copy_removes_fpi_and_player_reports(adjusted_bundle):
+    adjusted_bundle.board = [{"home": "T1"}]
     public = public_copy(adjusted_bundle)
+    adjusted_bundle.board = []
     assert public.adjustments is None
+    assert public.board == [] and public.game_logs == {} and public.season_stats.empty
     result = Predictor(public).predict("T1", "T2", simulations=200)
     assert result.adjustment is None
 
@@ -362,7 +365,25 @@ def test_app_shows_sources_and_says_the_layer_is_untested(tmp_path, adjusted_bun
     page.button[0].click().run()
     assert not page.exception
     text = page_text(page)
-    assert "FPI and player availability" in text
-    assert "no pre-game history exists" in text
+    assert "Official injury reports" in text
+    assert "untested add-on" in text
     assert "Tested model alone" in text
+    assert any("no pre-game history" in item.value for item in page.caption)
     assert len(page.dataframe) >= 1
+
+
+def test_a_report_never_carries_over_to_a_later_game():
+    inputs = make_inputs(reports=listed("out"), fpi={})
+    same = apply_adjustments("T1", "T2", 30.0, 20.0, 3.0, inputs, TODAY, date(2026, 11, 7))
+    later = apply_adjustments("T1", "T2", 30.0, 20.0, 3.0, inputs, TODAY, date(2026, 11, 14))
+    custom = apply_adjustments("T1", "T2", 30.0, 20.0, 3.0, inputs, TODAY)
+    assert same["home_expected"] == pytest.approx(27.0) and same["players"]
+    assert later["home_expected"] == 30.0 and not later["players"] and not later["home_has_reports"]
+    assert custom["home_expected"] == pytest.approx(27.0)
+
+
+def test_far_off_games_say_reports_are_not_out_yet(adjusted_bundle):
+    far = date.today() + timedelta(days=20)
+    notices = Predictor(adjusted_bundle).predict("T1", "T2", simulations=100, game_date=far).notices
+    text = " ".join(notice.text for notice in notices)
+    assert "aren't out yet" in text and "on file" not in text

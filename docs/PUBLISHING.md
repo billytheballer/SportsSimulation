@@ -56,9 +56,10 @@ The hosted app needs no API key, so don't add one. Keep your key in `.env` on yo
 | Team names and conferences | Needed for the team pickers |
 | This season's team pairings and dates, without scores | Used for rematch warnings |
 
-The `--public` option leaves out this season's scores and upcoming schedule, so a hosted app has no upcoming-games
-picker. It also leaves out ESPN FPI values and player reports, so a hosted app shows the tested model alone. FPI is
-ESPN's data and reports name individual players, so check the terms before changing this.
+The `--public` option leaves out this season's scores, schedule, box-score stats, ESPN FPI values, and player reports.
+A hosted copy therefore has no game dropdown, Schedule page, FPI, or injuries: it offers build-your-own matchups and
+team rankings from the tested model alone. FPI is ESPN's data and reports name individual players, so check the terms
+before publishing more. The full app runs on your own computer.
 
 **Your decision:** [CFBD's terms](https://collegefootballdata.com/terms) allow publishing models and other derived
 outputs, and don't allow redistributing raw data as a dataset. This file appears to fit as derived output, but the

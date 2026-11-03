@@ -420,14 +420,27 @@ class AdjustmentInputs:
     player_values: dict[str, dict[str, PlayerValue]]
     points_per_100_yards: dict[str, float]
     notes: list[str] = field(default_factory=list)
+    # ESPN's offense, defense, special teams, and resume figures, by team.
+    fpi_details: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
-def team_availability(team: str, inputs: AdjustmentInputs) -> tuple[float, list[dict[str, Any]]]:
+def reports_for_game(team: str, inputs: AdjustmentInputs, game_date: date | None) -> list[dict[str, Any]]:
+    """A report covers only its own game, so it never carries over to a later week.
+
+    With no date, as in a build-your-own matchup, the team's next-game reports apply.
+    """
+    reports = inputs.reports.get(team, [])
+    return reports if game_date is None else [report for report in reports if report["game_date"] == game_date]
+
+
+def team_availability(
+    team: str, inputs: AdjustmentInputs, game_date: date | None = None
+) -> tuple[float, list[dict[str, Any]]]:
     """Expected points a team loses to listed absences, plus a row for each listed player."""
     total = 0.0
     rows = []
     values = inputs.player_values.get(team, {})
-    for report in inputs.reports.get(team, []):
+    for report in reports_for_game(team, inputs, game_date):
         value = values.get(normalize_name(report["player"]))
         chance = ABSENCE_CHANCE[report["status"]]
         points = 0.0
@@ -466,14 +479,15 @@ def apply_adjustments(
     home_field: float,
     inputs: AdjustmentInputs,
     today: date,
+    game_date: date | None = None,
 ) -> dict[str, Any]:
     """Move expected points for availability, then blend the margin toward FPI.
 
     Lost points come off the listed player's own team. The FPI blend moves the margin
     only, so it leaves the projected total unchanged.
     """
-    home_lost, home_rows = team_availability(home, inputs)
-    away_lost, away_rows = team_availability(away, inputs)
+    home_lost, home_rows = team_availability(home, inputs, game_date)
+    away_lost, away_rows = team_availability(away, inputs, game_date)
     adjusted_home, adjusted_away = home_expected - home_lost, away_expected - away_lost
 
     use_fpi = fpi_is_fresh(inputs, today) and home in inputs.fpi and away in inputs.fpi
@@ -496,8 +510,8 @@ def apply_adjustments(
         "fpi_as_of": inputs.fpi_as_of,
         "fpi_weight": inputs.fpi_weight,
         "players": home_rows + away_rows,
-        "home_has_reports": bool(inputs.reports.get(home)),
-        "away_has_reports": bool(inputs.reports.get(away)),
+        "home_has_reports": bool(reports_for_game(home, inputs, game_date)),
+        "away_has_reports": bool(reports_for_game(away, inputs, game_date)),
     }
 
 
@@ -521,6 +535,21 @@ def latest_fpi_snapshot(season: int, directory: Path = FPI_SNAPSHOT_DIR) -> tupl
         if row.get("year") == season and row.get("fpi") is not None
     }
     return ratings, datetime.fromisoformat(content["saved_at"]).date()
+
+
+def latest_fpi_details(season: int, directory: Path = FPI_SNAPSHOT_DIR) -> dict[str, dict[str, Any]]:
+    paths = sorted(directory.glob("*.json")) if directory.exists() else []
+    if not paths:
+        return {}
+    content = json.loads(paths[-1].read_text())
+    return {
+        row["team"]: {
+            "efficiencies": row.get("efficiencies") or {},
+            "ranks": row.get("resumeRanks") or {},
+        }
+        for row in content["ratings"]
+        if row.get("year") == season
+    }
 
 
 def write_forecast_log(entries: list[dict[str, Any]], directory: Path = FORECAST_LOG_DIR, now: datetime | None = None) -> Path | None:

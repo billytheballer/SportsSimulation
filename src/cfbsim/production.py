@@ -27,6 +27,7 @@ from cfbsim.adjustments import (
     AdjustmentInputs,
     active_reports,
     current_player_values,
+    latest_fpi_details,
     latest_fpi_snapshot,
     load_reports,
     parse_player_box,
@@ -144,6 +145,7 @@ def update_season(client: CFBDClient, season: int = CURRENT_SEASON) -> dict[str,
         client.get(endpoint, refresh=True, **params)
     # Preseason values and benchmarks: fetched once, and then the saved copies are reused.
     for endpoint, params in (
+        ("teams/fbs", {"year": season}),
         ("player/returning", {"year": season}),
         ("recruiting/teams", {"year": season}),
         *(("lines", {"year": season, "seasonType": kind}) for kind in SEASON_TYPES),
@@ -177,6 +179,7 @@ def _upcoming(records: list[dict[str, Any]], now: pd.Timestamp) -> list[dict[str
                 "home": record["homeTeam"],
                 "away": record["awayTeam"],
                 "neutral_site": bool(record.get("neutralSite")),
+                "time_tbd": bool(record.get("startTimeTBD")),
             }
         )
     return sorted(games, key=lambda game: (game["kickoff_time"], game["home"]))
@@ -291,6 +294,10 @@ def public_copy(bundle: PredictionBundle) -> PredictionBundle:
         upcoming=[],
         # FPI is ESPN's data, and reports name individual players, so neither is published.
         adjustments=None,
+        # These are built from this season's raw scores, schedule, and box scores.
+        board=[],
+        game_logs={},
+        season_stats=pd.DataFrame(),
     )
 
 
@@ -314,7 +321,9 @@ def build_adjustments(
     messages = [f"Report names an unknown team: {team}" for team in reports if team not in known]
     if not fpi:
         messages.append("No FPI snapshot found. Run `cfbsim update-season`.")
-    return AdjustmentInputs(fpi, fpi_as_of, FPI_WEIGHT, reports, values, impact), messages
+    inputs = AdjustmentInputs(fpi, fpi_as_of, FPI_WEIGHT, reports, values, impact)
+    inputs.fpi_details = latest_fpi_details(season)
+    return inputs, messages
 
 
 def public_adjustment_note() -> str:
@@ -323,35 +332,25 @@ def public_adjustment_note() -> str:
 
 def log_upcoming_forecasts(bundle: PredictionBundle, days: int = 7, today: date | None = None) -> Any:
     """Save base and adjusted forecasts for the coming week, so the layer can be scored later."""
-    # Imported here because the prediction service imports the bundle module.
-    from cfbsim.predictor import Predictor
-
     today = today or date.today()
-    predictor = Predictor(bundle)
-    names = set(predictor.team_names())
-    entries = []
-    for game in bundle.upcoming:
-        if game["home"] not in names or game["away"] not in names or (game["kickoff"] - today).days > days:
-            continue
-        result = predictor.predict(game["home"], game["away"], game["neutral_site"], today=today)
-        base = result.base_summary or result.summary
-        adjustment = result.adjustment or {}
-        entries.append(
-            {
-                "kickoff": game["kickoff_time"],
-                "home": game["home"],
-                "away": game["away"],
-                "neutral_site": game["neutral_site"],
-                "base_home_win": base["home_win_probability"],
-                "adjusted_home_win": result.summary["home_win_probability"],
-                "stats_model_home_win": result.stats_model_home_probability,
-                "base_margin": base["margin"]["mean"],
-                "adjusted_margin": result.summary["margin"]["mean"],
-                "fpi_used": adjustment.get("fpi_used", False),
-                "fpi_as_of": adjustment.get("fpi_as_of"),
-                "players_listed": len(adjustment.get("players", [])),
-            }
-        )
+    entries = [
+        {
+            "kickoff": row["kickoff_time"],
+            "home": row["home"],
+            "away": row["away"],
+            "neutral_site": row["neutral_site"],
+            "base_home_win": row["tested_home_win"],
+            "adjusted_home_win": row["home_win"],
+            "stats_model_home_win": row["stats_model_home_win"],
+            "base_margin": row["tested_margin"],
+            "adjusted_margin": row["margin"],
+            "fpi_used": row["fpi_used"],
+            "fpi_as_of": row["fpi_as_of"],
+            "players_listed": row["players_listed"],
+        }
+        for row in bundle.board
+        if (row["kickoff"] - today).days <= days
+    ]
     return write_forecast_log(entries)
 
 
@@ -368,4 +367,21 @@ def build_production_bundle(client: CFBDClient, season: int = CURRENT_SEASON) ->
     if inputs is not None:
         inputs.notes = messages
     bundle.adjustment_messages = messages
+
+    # Imported here because the board uses the prediction service, which imports bundles.
+    from cfbsim.season_board import build_board, season_stat_table, team_details, team_game_logs
+
+    bundle.team_info = team_details(client.get("teams/fbs", year=season))
+    bundle.game_logs = team_game_logs(games, season)
+    box_records: list[dict[str, Any]] = []
+    for season_type in SEASON_TYPES:
+        typed = [r for r in records if r.get("season") == season and r["seasonType"] == season_type and r.get("completed")]
+        for week in sorted({record["week"] for record in typed}):
+            box_records += client.get(
+                "games/teams", year=season, week=week, seasonType=season_type, classification=CLASSIFICATION
+            )
+    season_ids = set(games.loc[games["season"] == season, "game_id"])
+    advanced = stats["advanced"][stats["advanced"]["game_id"].isin(season_ids)]
+    bundle.season_stats = season_stat_table(box_records, advanced, list(bundle.teams))
+    bundle.board = build_board(bundle, date.today())
     return bundle

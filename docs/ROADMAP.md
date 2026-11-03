@@ -74,6 +74,7 @@ team ratings and stats without refitting anything, and they're scored as a live 
   [publishing checklist](PUBLISHING.md)
 - Tested from a clean clone, and with a hosting-style install that has no raw data or API key
 - A `--public` bundle option that leaves out this season's scores and schedule
+- A full app: Game Center with every remaining game, Schedule, Teams, Injuries, and About the Model
 - Still to do by the owner: merge to `main`, make the repo public, and optionally deploy
 
 ## Stage 6: Advanced experiments (kept only if they win on validation)

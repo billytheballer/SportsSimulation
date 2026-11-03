@@ -30,7 +30,7 @@ from cfbsim.stats import load_stats
 BUNDLES_DIR = PROJECT_ROOT / "bundles"
 DEMO_BUNDLE = BUNDLES_DIR / "demo_2022.joblib"
 PRODUCTION_BUNDLE = BUNDLES_DIR / "production_2026.joblib"
-BUNDLE_FORMAT = 2
+BUNDLE_FORMAT = 3
 HISTORICAL = "historical_demo"
 PRODUCTION = "production"
 
@@ -102,6 +102,11 @@ class PredictionBundle:
     # The FPI and availability layer. None means predictions use the base model alone.
     adjustments: Any = None
     adjustment_messages: list[str] = field(default_factory=list)
+    # App content built ahead of time: team details, box-score averages, game logs, predictions.
+    team_info: dict[str, dict[str, Any]] = field(default_factory=dict)
+    season_stats: pd.DataFrame = field(default_factory=pd.DataFrame)
+    game_logs: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    board: list[dict[str, Any]] = field(default_factory=list)
     format_version: int = BUNDLE_FORMAT
 
 

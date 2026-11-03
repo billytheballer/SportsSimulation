@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
 from test_stage2 import make_league
@@ -26,7 +27,16 @@ from cfbsim.config import DEVELOPMENT_SEASONS, TUNE_SEASONS
 from cfbsim.elo import EloParams, run_elo
 from cfbsim.features import ALL_FEATURES, FeatureParams, walk_forward
 from cfbsim.model import WinModel
+from cfbsim.app import ui
+from cfbsim.app.theme import team_accent
 from cfbsim.predictor import Predictor, assess_freshness
+from cfbsim.season_board import (
+    build_board,
+    confidence_label,
+    projected_records,
+    season_stat_table,
+    team_details,
+)
 from cfbsim.stage3 import fit_stack, scored_frame
 
 APP_PATH = str(Path(__file__).resolve().parents[1] / "streamlit_app.py")
@@ -194,23 +204,23 @@ def page_text(page) -> str:
     return " ".join(item.value for item in page.markdown)
 
 
-def test_app_warns_about_old_data_before_any_prediction(app):
+def test_app_warns_about_old_data_on_the_first_screen(app):
     page = app.run()
     assert not page.exception
     assert "Historical demonstration" in page_text(page)
     assert "not a forecast" in page_text(page)
 
 
-def test_app_generates_a_prediction_with_the_warning_still_visible(app):
+def test_demo_view_builds_a_custom_matchup_with_the_warning_still_visible(app):
     page = app.run()
     page.button[0].click().run()
     assert not page.exception
     text = page_text(page)
-    assert "Win probability" in text and "not a forecast" in text
+    assert "Win chance" in text and "not a forecast" in text
     assert "10,000" in text
 
 
-def test_app_neutral_site_option_changes_the_card(app):
+def test_neutral_site_appears_on_the_scoreboard(app):
     page = app.run()
     page.checkbox[0].check()
     page.button[0].click().run()
@@ -234,43 +244,170 @@ def test_app_explains_when_no_bundle_exists(tmp_path, monkeypatch):
     assert any("build-demo" in item.value for item in page.error)
 
 
-@pytest.fixture
-def two_bundle_app(tmp_path, demo, monkeypatch):
+def upcoming_game(home, away, week, offset=30, neutral=False):
+    kickoff = date.today() + timedelta(days=offset)
+    return {
+        "kickoff": kickoff, "kickoff_time": None, "week": week, "time_tbd": True,
+        "home": home, "away": away, "neutral_site": neutral,
+    }
+
+
+@pytest.fixture(scope="module")
+def season_bundle():
     upcoming = [
-        {
-            "kickoff": date(2026, 11, 7), "kickoff_time": None, "week": 11,
-            "home": "T3", "away": "T4", "neutral_site": True,
-        }
+        upcoming_game("T3", "T4", 11, neutral=True),
+        upcoming_game("T1", "T2", 11),
+        upcoming_game("T5", "T6", 12, offset=37),
     ]
-    production = make_bundle(kind=PRODUCTION, data_through=date.today(), upcoming=upcoming)
-    monkeypatch.setattr(bundle_module, "DEMO_BUNDLE", save_bundle(demo, tmp_path / "demo.joblib"))
-    monkeypatch.setattr(bundle_module, "PRODUCTION_BUNDLE", save_bundle(production, tmp_path / "production.joblib"))
+    bundle = make_bundle(kind=PRODUCTION, data_through=date.today(), upcoming=upcoming)
+    box = [
+        {"id": 1, "teams": [
+            {"team": "T1", "points": 30, "stats": [
+                {"category": "totalYards", "stat": "400"}, {"category": "rushingAttempts", "stat": "30"},
+                {"category": "completionAttempts", "stat": "20-30"}, {"category": "thirdDownEff", "stat": "6-12"},
+                {"category": "turnovers", "stat": "1"}, {"category": "totalPenaltiesYards", "stat": "5-40"},
+                {"category": "possessionTime", "stat": "30:30"},
+            ]},
+            {"team": "T2", "points": 20, "stats": [
+                {"category": "totalYards", "stat": "300"}, {"category": "rushingAttempts", "stat": "25"},
+                {"category": "completionAttempts", "stat": "15-25"}, {"category": "thirdDownEff", "stat": "3-12"},
+                {"category": "turnovers", "stat": "2"}, {"category": "sacks", "stat": "3"},
+            ]},
+        ]}
+    ]
+    bundle.season_stats = season_stat_table(box, pd.DataFrame(), ["T1", "T2"])
+    bundle.game_logs = {"T1": [{"date": date(2026, 9, 5), "week": 1, "opponent": "T2", "site": "vs", "neutral": False,
+                                "result": "W", "points_for": 30, "points_against": 20}]}
+    bundle.team_info = team_details([{"school": "T1", "abbreviation": "ONE", "mascot": "Ones", "color": "#000000",
+                                      "alternateColor": "#ff0000", "location": {"name": "One Field", "city": "Town"}}])
+    bundle.board = build_board(bundle)
+    return bundle
+
+
+@pytest.fixture
+def season_app(tmp_path, season_bundle, monkeypatch):
+    monkeypatch.setattr(bundle_module, "DEMO_BUNDLE", tmp_path / "missing.joblib")
+    monkeypatch.setattr(bundle_module, "PRODUCTION_BUNDLE", save_bundle(season_bundle, tmp_path / "production.joblib"))
     return AppTest.from_file(APP_PATH, default_timeout=60)
 
 
-def test_current_season_shows_its_data_date_by_default(two_bundle_app):
-    page = two_bundle_app.run()
+def by_label(page, label):
+    return next(item for item in page.selectbox if item.label.startswith(label))
+
+
+def test_every_remaining_game_is_in_the_dropdown(season_app):
+    page = season_app.run()
     assert not page.exception
-    assert page.radio[0].value == "Current season"
-    assert "Team stats current through" in page_text(page)
-    assert "not a forecast" not in page_text(page)
+    by_label(page, "Week").set_value("All").run()
+    options = by_label(page, "Game").options
+    assert len(options) == 3
+    assert any("T4 vs. T3" in option for option in options)
+    assert any("T2 at T1" in option for option in options)
 
 
-def test_switching_to_history_shows_the_warning_and_hides_the_old_prediction(two_bundle_app):
-    page = two_bundle_app.run()
-    page.button[0].click().run()
-    assert "Win probability" in page_text(page)
-    page.radio[0].set_value("Historical demonstration (2022)").run()
+def test_game_center_opens_with_the_next_week_and_a_full_scoreboard(season_app):
+    page = season_app.run()
+    assert not page.exception
+    assert by_label(page, "Week").value == "Week 11"
+    text = page_text(page)
+    assert "Win chance" in text and "Projected score" in text
+    assert "Stats through" in text
+
+
+def test_picking_a_game_changes_the_scoreboard(season_app):
+    page = season_app.run()
+    choice = next(option for option in by_label(page, "Game").options if "T2 at T1" in option)
+    by_label(page, "Game").set_value(choice).run()
     assert not page.exception
     text = page_text(page)
-    assert "not a forecast" in text and "Win probability" not in text
+    assert ">T1<" in text and ">T2<" in text
 
 
-def test_picking_an_upcoming_game_fills_in_the_matchup(two_bundle_app):
-    page = two_bundle_app.run()
-    picker = page.selectbox[0]
-    assert picker.label == "Upcoming games (optional)"
-    picker.set_value("Nov 7 · T4 vs. T3").run()
+def test_filters_narrow_the_game_list(season_app):
+    page = season_app.run()
+    by_label(page, "Week").set_value("All").run()
+    by_label(page, "Team").set_value("T5").run()
     assert not page.exception
-    assert page.selectbox[1].value == "T3" and page.selectbox[2].value == "T4"
-    assert page.checkbox[0].value is True
+    assert len(by_label(page, "Game").options) == 1
+
+
+def test_build_your_own_matchup_still_works(season_app):
+    page = season_app.run()
+    page.toggle[0].set_value(True).run()
+    page.button[0].click().run()
+    assert not page.exception
+    assert "Hypothetical matchup" in page_text(page)
+
+
+@pytest.mark.parametrize("view", ["Schedule", "Teams", "Injuries", "About the Model"])
+def test_every_page_loads(season_app, view):
+    page = season_app.run()
+    page.radio[0].set_value(view).run()
+    assert not page.exception
+
+
+def test_schedule_shows_every_game_and_its_highlights(season_app):
+    page = season_app.run()
+    page.radio[0].set_value("Schedule").run()
+    by_label(page, "Week").set_value("All").run()
+    assert not page.exception
+    assert "Closest game" in page_text(page)
+    assert len(page.dataframe[0].value) == 3
+
+
+def test_about_page_reports_the_final_evaluation_and_the_untested_add_on(season_app):
+    page = season_app.run()
+    page.radio[0].set_value("About the Model").run()
+    text = page_text(page)
+    assert "2023-25" in text and "untested" in text
+    assert "closing line" not in text.lower()
+
+
+def test_board_numbers_match_the_game_page(season_bundle):
+    row = next(item for item in season_bundle.board if item["home"] == "T1")
+    result = Predictor(season_bundle).predict("T1", "T2", False, game_date=row["kickoff"])
+    assert result.summary["home_win_probability"] == row["home_win"]
+    assert result.summary["margin"]["mean"] == row["margin"]
+
+
+def test_games_that_have_kicked_off_leave_the_lists(season_bundle):
+    past = dict(season_bundle.board[0], kickoff_time=pd.Timestamp.now(tz="UTC") - pd.Timedelta(hours=1))
+    future = dict(season_bundle.board[1], kickoff_time=pd.Timestamp.now(tz="UTC") + pd.Timedelta(hours=1))
+    altered = make_bundle(board=[past, future])
+    assert ui.remaining_games(altered) == [future]
+
+
+def test_projected_wins_add_win_chances_to_the_current_record():
+    board = [{"home": "A", "away": "B", "home_win": 0.75, "away_win": 0.25}]
+    projections = projected_records(board, {"A": "5-3", "B": "2-6"})
+    assert projections["A"]["projected_wins"] == pytest.approx(5.75)
+    assert projections["B"]["projected_losses"] == pytest.approx(6.75)
+
+
+def test_season_stats_rank_one_is_always_best(season_bundle):
+    table = season_bundle.season_stats
+    assert table.at["T1", "points"] == 30 and table.at["T1", "points_allowed"] == 20
+    assert table.at["T1", "yards_per_play"] == pytest.approx(400 / 60)
+    assert table.at["T1", "third_down_pct"] == pytest.approx(50.0)
+    assert table.at["T1", "points_rank"] == 1 and table.at["T1", "points_allowed_rank"] == 1
+    assert table.at["T2", "turnovers_rank"] == 2 and table.at["T1", "takeaways"] == 2
+
+
+def test_missing_stats_stay_missing():
+    table = season_stat_table(
+        [{"id": 1, "teams": [{"team": "A", "points": 7, "stats": []}, {"team": "B", "points": 3, "stats": []}]}],
+        pd.DataFrame(), ["A", "B"],
+    )
+    assert pd.isna(table.at["A", "total_yards"]) and table.at["A", "points"] == 7
+
+
+@pytest.mark.parametrize(
+    "color, expected",
+    [("#000000", "#ff0000"), ("#bb0000", "#bb0000"), ("nonsense", "#ff0000"), (None, "#ff0000")],
+)
+def test_team_accents_stay_visible_on_the_dark_page(color, expected):
+    assert team_accent({"color": color, "alternate_color": "#ff0000"})[0] == expected
+
+
+def test_confidence_words():
+    assert [confidence_label(p) for p in (0.52, 0.6, 0.7, 0.9, 0.1)] == ["Toss-up", "Lean", "Solid", "Strong", "Strong"]

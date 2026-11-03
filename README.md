@@ -1,14 +1,15 @@
-# College Football Matchup Simulator
+# Gridiron Forecast
 
-Pick two FBS teams and get win probabilities, projected scores, 10,000 simulated outcomes, and the
-factors behind the prediction. Every number comes from a statistical model trained on historical
-data and tested on games it never saw. No language model picks a winner.
+A college football prediction app. Pick any remaining FBS game of the regular season and get win chances,
+projected scores, 10,000 simulated outcomes, team stats, ESPN FPI, official injury reports, and the factors
+behind the pick. Predictions come from a statistical model trained on historical data and tested on games it
+never saw, plus a clearly labeled, untested FPI and injury add-on. No language model picks a winner.
 
-![A win probability prediction for Ohio State against Oregon at a neutral site](docs/images/prediction.jpg)
+![The Game Center showing Oregon at Ohio State](docs/images/prediction.jpg)
 
 | | |
 |---|---|
-| ![Score ranges and simulated results](docs/images/score-ranges.jpg) | ![The factors behind the prediction](docs/images/factors.jpg) |
+| ![Predictions for the rest of the season](docs/images/schedule.jpg) | ![The factors behind a prediction](docs/images/factors.jpg) |
 
 *Screenshots from November 3, 2026, using team data through October 31, 2026.*
 
@@ -64,13 +65,19 @@ Then paste your key into `.env`. Git ignores this file, so your key won't be pub
 uv run streamlit run streamlit_app.py
 ```
 
-The app opens at `http://localhost:8501`. It needs a model bundle in `bundles/`, which you build once
-using the steps below. It reads only that bundle, so it doesn't need your key while running.
+The app opens at `http://localhost:8501`. It needs a model bundle in `bundles/`, which you build using the
+steps below. It reads only that bundle, so it doesn't need your key while running.
 
-Team data comes with a clear notice on every page:
+| Page | What's there |
+|---|---|
+| **Game Center** | A dropdown of every remaining game, with filters by week, conference, and team. Win chances, projected scores and ranges, simulations, team stats, FPI, injuries, and what drives the pick. You can also build your own matchup |
+| **Schedule** | Predictions for all remaining games, with the closest games and biggest favorites. Select a row to open that game |
+| **Teams** | Rankings, projected wins, and each team's remaining games, results, and season stats |
+| **Injuries** | Official reports on file, with their sources and how they affect forecasts |
+| **About the Model** | How it works, how accurate it is, where to be careful, and what the terms mean |
 
-- **Current season** shows the date team stats are current through. It warns you when that data is out of date.
-- **Historical demonstration** uses teams as of the end of 2022 and is never presented as a current forecast.
+The header always shows how current the stats, FPI, and injury reports are, and warns you when data is out of date.
+If only the 2022 demonstration is built, the app says so and never presents it as a current forecast.
 
 ## Build the model bundles
 
