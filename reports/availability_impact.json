@@ -1,0 +1,40 @@
+{
+  "seasons": [
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021,
+    2022
+  ],
+  "games": 5157,
+  "games_with_a_valued_absence": 1713,
+  "points_per_100_lost_yards": {
+    "qb": 0.9700402660610296,
+    "skill": 1.1046049052433236
+  },
+  "unfloored_estimates": {
+    "qb": 0.9700402660610296,
+    "skill": 2.106645205053655
+  },
+  "interval_95": {
+    "qb": [
+      0.4764049542420092,
+      1.4407897237271872
+    ],
+    "skill": [
+      1.1046049052433236,
+      3.097886479275731
+    ]
+  },
+  "check_on_2021_22": {
+    "fit_on_2016_20": {
+      "qb": 0.6429040562382646,
+      "skill": 1.5743816658265617
+    },
+    "margin_mae_without": 12.692178828004241,
+    "margin_mae_with_who_actually_played": 12.619356414241036,
+    "note": "An upper limit, since it uses who actually played, known only after each game."
+  }
+}

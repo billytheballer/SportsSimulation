@@ -1,0 +1,21 @@
+# Secrets: CFBD keys must never reach a public repo.
+.env
+.streamlit/secrets.toml
+
+# CFBD terms treat committed raw API data as redistribution. Keep it local.
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+
+# macOS
+.DS_Store
+
+# Built model bundles. See the README before choosing to publish one.
+bundles/

@@ -1,0 +1,51 @@
+{
+  "settings": {
+    "elo_params": {
+      "k": 40.0,
+      "home_advantage": 55.0,
+      "season_carryover": 0.7,
+      "lower_division_initial": 1000.0
+    },
+    "score_feature_params": {
+      "halflife": 8.0,
+      "season_weight": 0.5
+    },
+    "alpha": 300.0,
+    "bandwidth": 3.0,
+    "win_feature_params": {
+      "halflife": 8.0,
+      "season_weight": 0.5
+    },
+    "win_C": 0.03
+  },
+  "training_seasons": [
+    2016,
+    2017,
+    2018,
+    2019,
+    2020
+  ],
+  "evaluation_seasons": [
+    2023,
+    2024,
+    2025
+  ],
+  "source_hashes": {
+    "backtest.py": "dd1278f389f8a26e02c66fc5537b806b1474bf8aea665f9807c9669efbd00c75",
+    "config.py": "1b9c368d3d631f7a5bfabe61817b9ff522ebdf03e839f58c0e7c80ea456fafd2",
+    "elo.py": "3c34f5fdd1176d2934302dbc037aabd56ac6071edd9274b0a571b2055cb2e483",
+    "features.py": "2d390f74ccafa68ba622747afc58fcb605a874b610920ae2a17098d8f29701b1",
+    "final_eval.py": "4c5ad239d3716f5ce18ef27848e4276e61f197bab97aaa638edfc3a68853d489",
+    "games.py": "fa1d26390f900f9026d4cfdaf446c340546671b8ab1cd7142a4350cf6b349065",
+    "metrics.py": "89e20a839d2fc9d46837ab8fd90d23ca0c1ae652590227919a7b557692f34220",
+    "model.py": "43ea27a8a4254ab7b46122f7932ab1c72af55f898e776d445ed66ea8cc2f5177",
+    "scoring.py": "63f53f8cd97614d23ced2f44559ed4eba02c650038f6c92fd264725fbea0fb46",
+    "simulate.py": "5008031bd63ec497fed3cf71587602861049d760d00dfd3ffe646fdab48dd7b7",
+    "stage2.py": "7cd3f554dd4744522fba72134a8b2f81ac3d4e1437b4803b9e0cb88fb3b7db7f",
+    "stage3.py": "6b1dd74ab1384539e08ea29c4bda04b0370b00e1fe21564f2a0e531909532dc5",
+    "stats.py": "ecaee4b21668c6fa5716bbcb91a12427d6ddf42d57fe65a0297f37499950f2f8"
+  },
+  "stage3_report_hash": "0f10beb8fa0555966922b58e20edc020c10cfbbd74c91e72f6a740113e20ef66",
+  "data_fingerprint": "93a13f025ee47d50569a57bcd866235e819f8f92d4eae5844b989b9e350b9a06",
+  "frozen_at": "2026-11-03T17:44:32.690652+00:00"
+}
